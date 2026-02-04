@@ -13,23 +13,22 @@ import javax.servlet.http.HttpSession;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import static com.hmdp.utils.RedisConstants.LOGIN_USER_KEY;
+import static com.hmdp.utils.RedisConstants.LOGIN_USER_TTL;
+
 public class LoginInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        // 1. 判断是否需要拦截（ThreadLocal有没有用户）
+        // 3. 判断是否存在（ThreadLocal有没有用户）
         if(UserHolder.getUser() == null) {
+            // 4. 不存在，需要拦截，返回401状态码
+            response.setStatus(401);
             // 拦截
             return false;
         }
-        // 有用户就放行
+        // 有用户，则放行
         return true;
-
     }
 
-    @Override
-    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
-        // 移除用户
-        UserHolder.removeUser();
-    }
 }

@@ -67,7 +67,7 @@ public class CacheClient {
             return null;
         }
         // 6. 存在，写入redis，并添加超时剔除策略
-        this.setWithLogicalExpire(key, r, time, unit);
+        this.set(key, r, time, unit);
         // 7. 返回
         return r;
     }
