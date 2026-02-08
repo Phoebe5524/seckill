@@ -8,8 +8,10 @@ import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherOrderService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.utils.RedisIdWorker;
+import com.hmdp.utils.SimpleRedisLock;
 import com.hmdp.utils.UserHolder;
 import org.springframework.aop.framework.AopContext;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +34,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
     @Resource
     private RedisIdWorker redisIdWorker;
+
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
     @Override
     public Result seckillVoucher(Long voucherId) {
         // 1. 查询优惠券信息
@@ -52,11 +57,26 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.fail("库存不足");
         }
         Long userId = UserHolder.getUser().getId();
-        synchronized (userId.toString().intern()) {
+        // create lock object
+        SimpleRedisLock lock = new SimpleRedisLock("order" + userId, stringRedisTemplate);
+
+        // get lock
+        boolean isLock = lock.tryLock(1200);
+
+        // decide wheather get the lock successfully
+        if (!isLock) {
+            // get lock failed, return fault or retry
+            return Result.fail("不允许重复下单");
+        }
+        // get proxy object(transaction)
+        try {
             // to avoid spring transaction failure
             IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
-            // the affair should take effect before release the lock
+            // the transaction should take effect before release the lock
             return proxy.createVoucherOrder(voucherId);
+        } finally {
+            // release lock
+            lock.unlock();
         }
     }
     @Transactional
